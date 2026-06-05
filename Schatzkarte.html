@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Käpt'n Vektors Schatzkarte</title>
+<style>
+  :root {
+    --parchment: #f4e4bc;
+    --parchment-dark: #d4b886;
+    --parchment-edge: #b89968;
+    --ink: #3a2817;
+    --sand: #ecd9a3;
+    --grid: #b89968;
+    --blue: #1f6fb4;
+    --red: #c0392b;
+    --gold: #d4a017;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    padding: 16px;
+    font-family: 'Hoefler Text', 'Iowan Old Style', 'Garamond', 'Georgia', 'Times New Roman', serif;
+    background:
+      radial-gradient(ellipse at center, #4a6585 0%, #1f2c44 100%);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    color: #f4e4bc;
+    font-size: clamp(1.4em, 3vw, 2.2em);
+    margin: 0 0 16px 0;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 6px rgba(0,0,0,0.6);
+  }
+  main {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(420px, 1.6fr);
+    gap: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 850px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  /* Pergament-Brief */
+  .brief {
+    background: var(--parchment);
+    background-image:
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(180,140,80,0.18), transparent 70%),
+      radial-gradient(ellipse 70% 60% at 80% 90%, rgba(120,90,50,0.25), transparent 70%),
+      radial-gradient(circle at 60% 40%, rgba(120,90,50,0.10), transparent 50%);
+    border: 1px solid var(--parchment-edge);
+    border-radius: 6px;
+    padding: 24px 28px;
+    box-shadow:
+      4px 4px 14px rgba(0,0,0,0.45),
+      inset 0 0 40px rgba(140,100,60,0.18);
+    font-size: 1.05em;
+    line-height: 1.55;
+    position: relative;
+  }
+  .brief::before, .brief::after {
+    content: "";
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    background: rgba(120,90,50,0.18);
+    border-radius: 50%;
+    filter: blur(6px);
+  }
+  .brief::before { top: 8px; right: 14px; }
+  .brief::after { bottom: 12px; left: 18px; }
+  .brief h2 {
+    font-style: italic;
+    margin: 0 0 12px 0;
+    text-align: center;
+    letter-spacing: 1px;
+    font-size: 1.5em;
+  }
+  .brief p { margin: 8px 0; }
+  .brief ol {
+    list-style: none;
+    counter-reset: step;
+    padding: 0;
+    margin: 12px 0;
+  }
+  .brief li {
+    counter-increment: step;
+    padding: 8px 8px 8px 38px;
+    position: relative;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    transition: background 0.3s, opacity 0.3s;
+    font-style: italic;
+  }
+  .brief li::before {
+    content: counter(step) ".";
+    position: absolute;
+    left: 10px;
+    font-weight: bold;
+    font-style: normal;
+  }
+  .brief li.done {
+    text-decoration: line-through;
+    opacity: 0.45;
+  }
+  .brief li.done::before { content: "✓"; color: #2a7a2a; }
+  .brief li.current {
+    background: rgba(212,160,23,0.28);
+    border-left: 4px solid var(--gold);
+    padding-left: 34px;
+    font-weight: 500;
+  }
+  .brief li.future { opacity: 0.4; }
+  .signature {
+    text-align: right;
+    font-style: italic;
+    margin-top: 14px;
+  }
+
+  /* Karte */
+  .map-section {
+    background: var(--parchment);
+    border: 1px solid var(--parchment-edge);
+    border-radius: 6px;
+    padding: 6px;
+    box-shadow: 4px 4px 14px rgba(0,0,0,0.45);
+  }
+  svg { width: 100%; height: auto; display: block; }
+
+  /* Kontroll-Bereich */
+  .controls {
+    max-width: 1400px;
+    margin: 16px auto 0;
+    background: var(--parchment);
+    border: 1px solid var(--parchment-edge);
+    border-radius: 6px;
+    padding: 16px 20px;
+    box-shadow: 4px 4px 14px rgba(0,0,0,0.45);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .status {
+    flex: 1 1 320px;
+    font-size: 1.05em;
+    line-height: 1.4;
+  }
+  .status strong { color: var(--blue); }
+  .status .err { color: var(--red); font-weight: bold; }
+
+  .input-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .vec-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 1.4em;
+  }
+  .vec-display .label { font-style: italic; }
+  .bracket {
+    font-size: 2.4em;
+    line-height: 0.7;
+    color: var(--ink);
+    font-weight: 200;
+    user-select: none;
+  }
+  .components {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .components input {
+    width: 70px;
+    padding: 6px 4px;
+    font-size: 0.65em;
+    text-align: center;
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    background: white;
+    font-family: inherit;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .components input.error {
+    background: #fdd;
+    border-color: var(--red);
+  }
+  .components input:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(31,111,180,0.3);
+  }
+  button {
+    padding: 10px 18px;
+    font-size: 1em;
+    font-family: inherit;
+    cursor: pointer;
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    background: var(--gold);
+    color: var(--ink);
+    font-weight: bold;
+    box-shadow: 2px 2px 0 var(--ink);
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  button:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  button:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 var(--ink);
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .reset { background: var(--parchment-dark); }
+
+  /* Reflexion */
+  .reflection {
+    max-width: 1400px;
+    margin: 16px auto 0;
+    background: var(--parchment);
+    border: 4px solid var(--gold);
+    border-radius: 6px;
+    padding: 20px 24px;
+    box-shadow: 4px 4px 14px rgba(0,0,0,0.5);
+  }
+  .reflection h2 {
+    color: #a87d10;
+    margin: 0 0 8px 0;
+    font-size: 1.4em;
+  }
+  .reflection p { margin: 8px 0; line-height: 1.5; }
+  .reflection textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 1em;
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.6);
+    resize: vertical;
+  }
+  .reflection-input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+  }
+  .reflection-input .vec-display { font-size: 1.2em; }
+  .reflection-input .components input { width: 60px; }
+  .reflection-feedback {
+    margin-top: 10px;
+    font-weight: bold;
+    min-height: 1.4em;
+  }
+  .reflection-feedback.ok { color: #1a7a1a; }
+  .reflection-feedback.nope { color: var(--red); }
+  .ref-question { font-size: 1.08em; margin: 14px 0 10px; }
+  .ref-label {
+    display: block;
+    font-size: 0.92em;
+    font-weight: bold;
+    color: #6a4f30;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .reflection-actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid rgba(140,100,60,0.3);
+    padding-top: 14px;
+  }
+  /* Mathematische Vektor-Beschriftung: v mit Pfeil drüber + Index */
+  .ref-label-math {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 1.1em;
+  }
+  .vec-name {
+    position: relative;
+    display: inline-block;
+    font-style: italic;
+    padding: 0 1px;
+  }
+  .vec-name::after {
+    content: "→";
+    position: absolute;
+    top: -0.55em;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.55em;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    letter-spacing: -0.05em;
+  }
+  .ref-label-math sub { font-size: 0.7em; font-style: normal; }
+  .ref-equals {
+    font-size: 1.4em;
+    font-weight: normal;
+    color: var(--ink);
+    margin: 0 -2px;
+  }
+  /* Reflexion: Variante "direkt vom Start gefunden" */
+  .reflection .ref-intro-direct,
+  .reflection .ref-q-direct { display: none; }
+  .reflection.direct-found .ref-intro-route,
+  .reflection.direct-found .ref-q-route { display: none; }
+  .reflection.direct-found .ref-intro-direct,
+  .reflection.direct-found .ref-q-direct { display: block; }
+  .reflection.direct-found .reflection-input,
+  .reflection.direct-found .reflection-feedback { display: none; }
+</style>
+</head>
+<body>
+
+<h1>⚓ Käpt'n Vektors Schatzkarte ⚓</h1>
+
+<main>
+  <section class="brief">
+    <h2>Ahoi, Landratte!</h2>
+    <p>
+      Du hältst meinen letzten Brief in deinen zittrigen Pranken.
+      Vor langer Zeit habe ich auf dieser Insel meinen größten
+      Schatz vergraben. Folge meinen Anweisungen Schritt für
+      Schritt. Nur wer jede Anweisung richtig in Vektoren übersetzt, wird
+      mein Gold heben!
+    </p>
+    <p><em>Beginne deine Suche bei der einsamen 🌴 Palme.</em></p>
+    <ol id="brief-list"></ol>
+    <p class="signature">Möge der Wind dir günstig sein!<br>&mdash; Käpt'n Vektor</p>
+  </section>
+
+  <section class="map-section">
+    <svg id="map" viewBox="0 0 720 720" xmlns="http://www.w3.org/2000/svg" aria-label="Schatzkarte mit Koordinatensystem">
+      <defs>
+        <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f6fb4"/>
+        </marker>
+        <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b"/>
+        </marker>
+        <marker id="arrow-gold" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#d4a017"/>
+        </marker>
+        <marker id="arrow-axis" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#3a2817"/>
+        </marker>
+        <radialGradient id="treasure-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#fff5b8" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#fff5b8" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="720" height="720" fill="#ecd9a3"/>
+      <g id="grid"></g>
+      <g id="axes"></g>
+      <g id="labels"></g>
+      <g id="landmarks"></g>
+      <g id="paths"></g>
+      <g id="treasure-fx"></g>
+      <g id="pirate-group"></g>
+    </svg>
+  </section>
+</main>
+
+<section class="controls">
+  <div class="status" id="status"></div>
+  <div class="input-area">
+    <div class="vec-display">
+      <span class="label">v&#8407; =</span>
+      <span class="bracket">(</span>
+      <div class="components">
+        <input type="text" id="vx" inputmode="text" autocomplete="off" autocapitalize="off" aria-label="x-Komponente" placeholder="x">
+        <input type="text" id="vy" inputmode="text" autocomplete="off" autocapitalize="off" aria-label="y-Komponente" placeholder="y">
+      </div>
+      <span class="bracket">)</span>
+    </div>
+    <button id="go">Los, Käpt'n!</button>
+    <button id="reset" class="reset">🌴 Zurück zur Palme</button>
+  </div>
+</section>
+
+<section class="reflection" id="reflection" hidden>
+  <h2>🏆 Geschafft! Der Schatz gehört dir!</h2>
+  <p class="ref-intro-route">
+    Du bist Schritt für Schritt deinen Weg zum Schatz gegangen. Aber
+    es gibt auch <strong>einen einzigen Vektor</strong>, der dich
+    direkt von der 🌴 Palme zum 💰 Schatz bringen würde, ganz
+    ohne Umwege.
+  </p>
+  <p class="ref-intro-direct">
+    Stark, Landratte! Du hast vom Start <strong>direkt zum Schatz</strong>
+    gefunden — der goldene Pfeil auf der Karte zeigt deinen
+    Direktvektor <strong>(10 | 2)</strong>. Den hast du dir also
+    schon erarbeitet.
+  </p>
+  <p class="ref-question ref-q-route"><strong>Welche Anweisung in Worten und welcher Vektor führen direkt von der Palme zum Schatz?</strong></p>
+  <p class="ref-question ref-q-direct"><strong>Beschreibe diesen Direktweg jetzt noch einmal in Worten.</strong></p>
+
+  <label for="ref-words" class="ref-label">Anweisung in Worten</label>
+  <textarea id="ref-words" placeholder="z. B. „Zehn Schritte gen … und … Schritte gen …"></textarea>
+
+  <div class="reflection-input">
+    <label for="rx" class="ref-label ref-label-math"><span class="vec-name">v</span><sub>direkt</sub></label>
+    <span class="ref-equals">=</span>
+    <div class="vec-display">
+      <span class="bracket">(</span>
+      <div class="components">
+        <input type="text" id="rx" inputmode="text" autocomplete="off" autocapitalize="off" aria-label="x">
+        <input type="text" id="ry" inputmode="text" autocomplete="off" autocapitalize="off" aria-label="y">
+      </div>
+      <span class="bracket">)</span>
+    </div>
+    <button id="ref-check">Prüfen</button>
+  </div>
+  <div class="reflection-feedback" id="ref-feedback"></div>
+  <div class="reflection-actions">
+    <button id="reset-from-reflection" class="reset">🌴 Zurück zur Palme</button>
+  </div>
+</section>
+
+<script>
+"use strict";
+
+// ============== Routendaten ==============
+const ROUTE = [
+  { name: "Palme",            emoji: "🌴", pos: [-6, -4],
+    instruction: "Beginne deine Suche bei der einsamen Palme.",
+    vector: null },
+  { name: "großer Felsen",    emoji: "🪨", pos: [-1, -4],
+    instruction: "Fünf Schritte gen Osten — dort ragt der große Felsen aus dem Sand.",
+    vector: [5, 0] },
+  { name: "Schiffswrack",     emoji: "🛶", pos: [-1, -1],
+    instruction: "Drei Schritte in Richtung Polarstern führen dich zum Schiffswrack.",
+    vector: [0, 3] },
+  { name: "Felsenhöhle",      emoji: "🕳️", pos: [-4,  2],
+    instruction: "Nun schräg zur Felsenhöhle: drei Schritte nach Westen und drei nach Norden — zugleich.",
+    vector: [-3, 3] },
+  { name: "alter Leuchtturm", emoji: "🗼", pos: [-1,  4],
+    instruction: "Klettre schräg empor: drei Schritte gen Osten und zwei nach Norden — der alte Leuchtturm.",
+    vector: [3, 2] },
+  { name: "einsame Düne",     emoji: "🏜️", pos: [ 1,  5],
+    instruction: "Zwei Schritte gen Osten und einer nach Norden zur einsamen Düne.",
+    vector: [2, 1] },
+  { name: "Schatz",           emoji: "💰", pos: [ 4, -2],
+    instruction: "Drei Schritte gen Sonnenaufgang und sieben gen Süden — X markiert die Stelle!",
+    vector: [3, -7] }
+];
+
+// ============== Konstanten ==============
+const GRID_MIN = -8;
+const GRID_MAX =  8;
+const CELL = 40;
+const PAD = 40;
+
+// Grid -> SVG (y wird gespiegelt, da SVG-y nach unten zeigt)
+function gx(x) { return PAD + (x - GRID_MIN) * CELL; }
+function gy(y) { return PAD + (GRID_MAX - y) * CELL; }
+
+// ============== Zustand ==============
+let currentStep = 1;             // Index in ROUTE des nächsten Ziels (1..6)
+let piratePos = ROUTE[0].pos.slice();
+let pathSegments = [];           // {from, to, color}
+let animating = false;
+let won = false;                 // true, sobald der Schatz erreicht wurde (auch per Abkürzung)
+
+// ============== DOM-Referenzen ==============
+const briefList = document.getElementById("brief-list");
+const statusEl  = document.getElementById("status");
+const vxInput   = document.getElementById("vx");
+const vyInput   = document.getElementById("vy");
+const goBtn     = document.getElementById("go");
+const resetBtn  = document.getElementById("reset");
+const reflectionEl = document.getElementById("reflection");
+const controlsEl   = document.querySelector(".controls");
+
+// ============== Aufbau ==============
+function buildBrief() {
+  briefList.innerHTML = "";
+  for (let i = 1; i < ROUTE.length; i++) {
+    const li = document.createElement("li");
+    li.textContent = ROUTE[i].instruction;
+    li.dataset.idx = i;
+    briefList.appendChild(li);
+  }
+  updateBriefHighlight();
+}
+
+function updateBriefHighlight() {
+  briefList.querySelectorAll("li").forEach((li, idx) => {
+    const i = idx + 1;
+    li.classList.remove("done", "current", "future");
+    if (i < currentStep) li.classList.add("done");
+    else if (won) li.classList.add("future"); // übersprungene Stationen ausgrauen
+    else if (i === currentStep) li.classList.add("current");
+    else li.classList.add("future");
+  });
+}
+
+function buildGrid() {
+  let g = "";
+  for (let i = GRID_MIN; i <= GRID_MAX; i++) {
+    g += `<line x1="${gx(i)}" y1="${gy(GRID_MAX)}" x2="${gx(i)}" y2="${gy(GRID_MIN)}" stroke="#b89968" stroke-width="0.5" opacity="0.7"/>`;
+    g += `<line x1="${gx(GRID_MIN)}" y1="${gy(i)}" x2="${gx(GRID_MAX)}" y2="${gy(i)}" stroke="#b89968" stroke-width="0.5" opacity="0.7"/>`;
+  }
+  document.getElementById("grid").innerHTML = g;
+
+  let a = "";
+  // Achsen mit Pfeilspitzen
+  a += `<line x1="${gx(GRID_MIN) - 6}" y1="${gy(0)}" x2="${gx(GRID_MAX) + 6}" y2="${gy(0)}" stroke="#3a2817" stroke-width="1.5" marker-end="url(#arrow-axis)"/>`;
+  a += `<line x1="${gx(0)}" y1="${gy(GRID_MIN) + 6}" x2="${gx(0)}" y2="${gy(GRID_MAX) - 6}" stroke="#3a2817" stroke-width="1.5" marker-end="url(#arrow-axis)"/>`;
+  document.getElementById("axes").innerHTML = a;
+
+  let lab = "";
+  for (let i = GRID_MIN; i <= GRID_MAX; i++) {
+    if (i === 0) continue;
+    // x-Achsen-Beschriftung (unter der Achse)
+    lab += `<text x="${gx(i)}" y="${gy(0) + 14}" text-anchor="middle" font-size="11" fill="#3a2817">${i}</text>`;
+    // y-Achsen-Beschriftung (links der Achse)
+    lab += `<text x="${gx(0) - 6}" y="${gy(i) + 4}" text-anchor="end" font-size="11" fill="#3a2817">${i}</text>`;
+  }
+  // Ursprung
+  lab += `<text x="${gx(0) - 6}" y="${gy(0) + 14}" text-anchor="end" font-size="11" fill="#3a2817">0</text>`;
+  // Achsenbeschriftungen
+  lab += `<text x="${gx(GRID_MAX) + 12}" y="${gy(0) + 4}" font-size="14" font-style="italic" fill="#3a2817">x</text>`;
+  lab += `<text x="${gx(0) - 4}" y="${gy(GRID_MAX) - 12}" text-anchor="end" font-size="14" font-style="italic" fill="#3a2817">y</text>`;
+  // Himmelsrichtungen — als kleine Beschriftungen am Achsenende
+  lab += `<text x="4" y="${gy(0) - 8}" text-anchor="start" font-size="11" font-style="italic" font-weight="bold" fill="#3a2817">Westen ←</text>`;
+  lab += `<text x="716" y="${gy(0) - 8}" text-anchor="end" font-size="11" font-style="italic" font-weight="bold" fill="#3a2817">→ Osten</text>`;
+  lab += `<text x="${gx(0) + 8}" y="16" text-anchor="start" font-size="11" font-style="italic" font-weight="bold" fill="#3a2817">↑ Norden</text>`;
+  lab += `<text x="${gx(0) + 8}" y="712" text-anchor="start" font-size="11" font-style="italic" font-weight="bold" fill="#3a2817">↓ Süden</text>`;
+  document.getElementById("labels").innerHTML = lab;
+}
+
+function landmarkSvg(r) {
+  // kleiner heller Kreis als „Markierung" hinter dem Emoji
+  let h = `<circle cx="${gx(r.pos[0])}" cy="${gy(r.pos[1])}" r="14" fill="rgba(255,250,220,0.7)" stroke="#3a2817" stroke-width="0.8"/>`;
+  h += `<text x="${gx(r.pos[0])}" y="${gy(r.pos[1]) + 8}" text-anchor="middle" font-size="22">${r.emoji}</text>`;
+  h += `<text x="${gx(r.pos[0])}" y="${gy(r.pos[1]) + 28}" text-anchor="middle" font-size="9.5" font-style="italic" fill="#3a2817">${r.name}</text>`;
+  h += `<text x="${gx(r.pos[0])}" y="${gy(r.pos[1]) + 40}" text-anchor="middle" font-size="8.5" fill="#6a5030">(${r.pos[0]} | ${r.pos[1]})</text>`;
+  return h;
+}
+
+function buildLandmarks() {
+  let html = "";
+  // Schatz (letzter Eintrag) wird erst beim Finden enthüllt
+  for (let i = 0; i < ROUTE.length - 1; i++) {
+    html += landmarkSvg(ROUTE[i]);
+  }
+  document.getElementById("landmarks").innerHTML = html;
+}
+
+function revealTreasure() {
+  const t = ROUTE[ROUTE.length - 1];
+  document.getElementById("landmarks").insertAdjacentHTML("beforeend", landmarkSvg(t));
+}
+
+function drawPirate() {
+  const [x, y] = piratePos;
+  const cx = gx(x), cy = gy(y);
+  document.getElementById("pirate-group").innerHTML =
+    `<circle cx="${cx}" cy="${cy}" r="16" fill="none" stroke="#c0392b" stroke-width="2.5" style="filter: drop-shadow(0 0 3px rgba(192,57,43,0.45));">
+       <animate attributeName="r" values="14;22;14" dur="1.6s" repeatCount="indefinite"/>
+       <animate attributeName="stroke-opacity" values="1;0.35;1" dur="1.6s" repeatCount="indefinite"/>
+     </circle>`;
+}
+
+function drawPaths() {
+  let html = "";
+  pathSegments.forEach(seg => {
+    let stroke, marker, sw, dash = "";
+    if (seg.color === "red")  { stroke = "#c0392b"; marker = "arrow-red";  sw = 2; dash = ' stroke-dasharray="6,4"'; }
+    else if (seg.color === "gold") { stroke = "#d4a017"; marker = "arrow-gold"; sw = 3.5; }
+    else { stroke = "#1f6fb4"; marker = "arrow-blue"; sw = 2.5; }
+    html += `<line x1="${gx(seg.from[0])}" y1="${gy(seg.from[1])}" x2="${gx(seg.to[0])}" y2="${gy(seg.to[1])}" stroke="${stroke}" stroke-width="${sw}" opacity="0.9" marker-end="url(#${marker})"${dash}/>`;
+  });
+  document.getElementById("paths").innerHTML = html;
+}
+
+// ============== Statusanzeige ==============
+function updateStatus(html) {
+  if (html != null) { statusEl.innerHTML = html; return; }
+  if (won || currentStep >= ROUTE.length) {
+    statusEl.innerHTML = `🏆 <strong>Schatz gefunden!</strong>`;
+    return;
+  }
+  const t = ROUTE[currentStep];
+  const [x, y] = piratePos;
+  statusEl.innerHTML = `Du bist am Punkt <strong>(${x} | ${y})</strong>. Nächstes Ziel: ${t.emoji} <strong>${t.name}</strong>.<br><strong>Trage</strong> den Vektor <strong>ein</strong>, mit dem du dich zum nächsten Ziel bewegen kannst.`;
+}
+
+// ============== Animation ==============
+function animatePirate(from, to, durationMs, onDone) {
+  animating = true;
+  setControlsDisabled(true);
+  const sx0 = gx(from[0]), sy0 = gy(from[1]) + 9;
+  const sx1 = gx(to[0]),   sy1 = gy(to[1])   + 9;
+  // Während der Bewegung: Standort-Ring durch Flaggen-Emoji ersetzen
+  document.getElementById("pirate-group").innerHTML =
+    `<text id="pirate" x="${sx0}" y="${sy0}" text-anchor="middle" font-size="26" style="filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));">🏴‍☠️</text>`;
+  const pirate = document.getElementById("pirate");
+  const start = performance.now();
+
+  function step(ts) {
+    let t = (ts - start) / durationMs;
+    if (t > 1) t = 1;
+    // Ease-in-out
+    const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+    pirate.setAttribute("x", sx0 + (sx1 - sx0) * e);
+    pirate.setAttribute("y", sy0 + (sy1 - sy0) * e);
+    if (t < 1) requestAnimationFrame(step);
+    else {
+      animating = false;
+      setControlsDisabled(false);
+      onDone && onDone();
+      drawPirate(); // Nach der Bewegung wieder den Standort-Ring zeichnen
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+function setControlsDisabled(d) {
+  goBtn.disabled = d;
+  resetBtn.disabled = d;
+  vxInput.disabled = d;
+  vyInput.disabled = d;
+}
+
+// ============== Spiel-Logik ==============
+function go() {
+  if (animating || won || currentStep >= ROUTE.length) return;
+
+  const vxStr = vxInput.value.trim();
+  const vyStr = vyInput.value.trim();
+  const vx = parseFloat(vxStr);
+  const vy = parseFloat(vyStr);
+  let bad = false;
+  if (vxStr === "" || isNaN(vx)) { vxInput.classList.add("error"); bad = true; }
+  if (vyStr === "" || isNaN(vy)) { vyInput.classList.add("error"); bad = true; }
+  if (bad) {
+    setTimeout(() => {
+      vxInput.classList.remove("error");
+      vyInput.classList.remove("error");
+    }, 1200);
+    updateStatus(`<span class="err">Trag erst beide Komponenten ein, Landratte!</span>`);
+    return;
+  }
+
+  const oldPos = piratePos.slice();
+  const newPos = [oldPos[0] + vx, oldPos[1] + vy];
+
+  animatePirate(oldPos, newPos, 1000, () => {
+    piratePos = newPos;
+    const treasurePos = ROUTE[ROUTE.length - 1].pos;
+    const startPos = ROUTE[0].pos;
+    const target = currentStep < ROUTE.length ? ROUTE[currentStep].pos : null;
+    const hitNext = target && newPos[0] === target[0] && newPos[1] === target[1];
+    const hitTreasure = newPos[0] === treasurePos[0] && newPos[1] === treasurePos[1];
+
+    if (hitNext) {
+      // Planmäßiger Treffer der nächsten Station
+      pathSegments.push({ from: oldPos, to: newPos, color: "blue" });
+      currentStep++;
+      vxInput.value = "";
+      vyInput.value = "";
+      drawPaths();
+      updateBriefHighlight();
+      updateStatus();
+      vxInput.focus();
+      if (currentStep >= ROUTE.length) {
+        won = true;
+        celebrate(false);
+      }
+    } else if (hitTreasure) {
+      // Abkürzung: direkt auf den Schatz gestolpert (auch wenn er erst erscheint)
+      const directFromStart =
+        currentStep === 1 &&
+        oldPos[0] === startPos[0] && oldPos[1] === startPos[1];
+      pathSegments.push({
+        from: oldPos, to: newPos,
+        color: directFromStart ? "gold" : "blue"
+      });
+      won = true;
+      vxInput.value = "";
+      vyInput.value = "";
+      drawPaths();
+      updateBriefHighlight();
+      celebrate(directFromStart);
+    } else {
+      // Daneben: rote gestrichelte Spur, Pirat bleibt am falschen Ort.
+      pathSegments.push({ from: oldPos, to: newPos, color: "red" });
+      vxInput.value = "";
+      vyInput.value = "";
+      drawPaths();
+      const tgt = ROUTE[currentStep];
+      updateStatus(
+        `<span class="err">Hä? Da ist doch nichts!</span> Du stehst jetzt am Punkt <strong>(${newPos[0]} | ${newPos[1]})</strong>. ` +
+        `Gib einen Korrektur-Vektor ein, der dich zum ${tgt.emoji} <strong>${tgt.name}</strong> führt &mdash; ` +
+        `oder klicke „🌴 Zurück zur Palme".`
+      );
+      vxInput.focus();
+    }
+  });
+}
+
+function reset() {
+  if (animating) return;
+  currentStep = 1;
+  piratePos = ROUTE[0].pos.slice();
+  pathSegments = [];
+  won = false;
+  vxInput.value = "";
+  vyInput.value = "";
+  controlsEl.hidden = false;
+  reflectionEl.hidden = true;
+  reflectionEl.classList.remove("direct-found");
+  document.getElementById("ref-words").value = "";
+  document.getElementById("rx").value = "";
+  document.getElementById("ry").value = "";
+  document.getElementById("ref-feedback").textContent = "";
+  document.getElementById("ref-feedback").className = "reflection-feedback";
+  document.getElementById("treasure-fx").innerHTML = "";
+  buildLandmarks(); // Schatz wieder ausblenden
+  drawPaths();
+  drawPirate();
+  updateBriefHighlight();
+  updateStatus();
+  vxInput.focus();
+}
+
+function celebrate(directFromStart) {
+  // Reflexions-Variante wählen: direkt vom Start gefunden vs. normaler / mittlerer Weg
+  if (directFromStart) reflectionEl.classList.add("direct-found");
+  else reflectionEl.classList.remove("direct-found");
+  // Schatz aufdecken
+  revealTreasure();
+  // Funkeln um den Schatz
+  const [tx, ty] = ROUTE[ROUTE.length - 1].pos;
+  const cx = gx(tx), cy = gy(ty);
+  let fx = `<circle cx="${cx}" cy="${cy}" r="40" fill="url(#treasure-glow)">
+              <animate attributeName="r" values="20;55;20" dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite"/>
+            </circle>`;
+  // ein paar Sterne
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2;
+    const r = 30;
+    const px = cx + Math.cos(ang) * r;
+    const py = cy + Math.sin(ang) * r;
+    fx += `<text x="${px}" y="${py + 5}" text-anchor="middle" font-size="14">✨</text>`;
+  }
+  document.getElementById("treasure-fx").innerHTML = fx;
+
+  controlsEl.hidden = true;
+  reflectionEl.hidden = false;
+  reflectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ============== Reflexionsprüfung ==============
+function checkReflection() {
+  const rx = parseFloat(document.getElementById("rx").value);
+  const ry = parseFloat(document.getElementById("ry").value);
+  const fb = document.getElementById("ref-feedback");
+  if (rx === 10 && ry === 2) {
+    fb.textContent = "Genau! Vom Start direkt zum Ziel führt der Vektor (10 | 2). Schau auf die Karte: der goldene Pfeil zeigt die Bewegung durch diesen Vektor. Er ist die Summe aller sechs Einzelvektoren.";
+    fb.className = "reflection-feedback ok";
+    // Goldenen Direktpfeil zeichnen
+    if (!pathSegments.some(s => s.color === "gold")) {
+      pathSegments.push({ from: ROUTE[0].pos, to: ROUTE[ROUTE.length-1].pos, color: "gold" });
+      drawPaths();
+    }
+  } else {
+    fb.textContent = "Hmm, das stimmt noch nicht. Tipp: Wie weit liegt der 💰 Schatz östlich von der 🌴 Palme — und wie weit nördlich oder südlich? (Spitze minus Schaft!)";
+    fb.className = "reflection-feedback nope";
+  }
+}
+
+// ============== Event-Listener ==============
+goBtn.addEventListener("click", go);
+resetBtn.addEventListener("click", reset);
+document.getElementById("ref-check").addEventListener("click", checkReflection);
+document.getElementById("reset-from-reflection").addEventListener("click", reset);
+vxInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); vyInput.focus(); }});
+vyInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); }});
+document.getElementById("rx").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("ry").focus(); }});
+document.getElementById("ry").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); checkReflection(); }});
+
+// ============== Init ==============
+buildBrief();
+buildGrid();
+buildLandmarks();
+drawPirate();
+updateStatus();
+</script>
+
+</body>
+</html>
